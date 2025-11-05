@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NeteaseResourcesInstaller", "NeteaseResourcesInstaller\NeteaseResourcesInstaller.csproj", "{756D5656-2C52-4F59-9518-49F629C98767}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{756D5656-2C52-4F59-9518-49F629C98767}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{756D5656-2C52-4F59-9518-49F629C98767}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{756D5656-2C52-4F59-9518-49F629C98767}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{756D5656-2C52-4F59-9518-49F629C98767}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
