@@ -6,6 +6,9 @@
  - 支持导入mcpack材质包
  - 使用iNKORE.UI.WPF.Modern的现代化UI库(Winui3风格,更美观)
  - and more...
+# 赞助
+[爱发电](https://afdian.com/a/daijunhao)<br/>
+![PixPin_2025-11-08_20-52-43.png](https://x19.fp.ps.netease.com/file/690f3d2565265ad401c37256ob8yeKU106)
 # 软件截图
 ![8c2208454644bcd23217435e3cca8a73.png](https://x19.fp.ps.netease.com/file/690f3a4acbf37394756c869fFSQHblAB06)
 # 注意事项
