@@ -279,6 +279,8 @@ public partial class SettingsPage : Page
             selectedBedrockVersion = selectVersion,
             channel = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>).Item1
         }));
+        GetMinecraftVersions(bedrockPath);
+        selectBedrockFolder = selectVersion;
         Function.ShowDialog($"保存设置成功!\n - 你选择的基岩版路径: {Path.Combine(bedrockPath, selectVersion)}");
     }
 }
