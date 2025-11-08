@@ -4,9 +4,32 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NeteaseResourcesInstaller"
+        xmlns:ui="http://schemas.inkore.net/lib/ui/wpf/modern"
+        ui:WindowHelper.SystemBackdropType="Mica"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Loaded="MainWindow_OnLoaded"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="800" Width="1200">
     <Grid>
-
+        <ui:NavigationView x:Name="NavigationView_Root" IsPaneOpen="False" SelectionChanged="NavigationView_SelectionChanged" IsTitleBarAutoPaddingEnabled="True" IsSettingsVisible="True">
+            <ui:NavigationView.MenuItems>
+                <ui:NavigationViewItem x:Name="NavigationViewItem_Home" Content="主页">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:FontIcon Icon="{x:Static ui:SegoeFluentIcons.Home}"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavigationViewItem_ResourcesInstall" Content="材质包安装">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:FontIcon Icon="{x:Static ui:SegoeFluentIcons.AppIconDefault}"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavigationViewItem_Logs" Content="软件日志">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:FontIcon Icon="{x:Static ui:SegoeFluentIcons.Message}"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.MenuItems>
+            <ui:Frame x:Name="Frame_Main"/>
+        </ui:NavigationView>
     </Grid>
 </Window>

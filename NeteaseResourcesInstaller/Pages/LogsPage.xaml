@@ -1,0 +1,55 @@
+﻿<ui:Page x:Class="NeteaseResourcesInstaller.Pages.LogsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:NeteaseResourcesInstaller.Pages"
+      xmlns:ui="http://schemas.inkore.net/lib/ui/wpf/modern"
+      xmlns:ikw="http://schemas.inkore.net/lib/ui/wpf"
+      d:DesignHeight="600"
+      d:DesignWidth="800"
+      mc:Ignorable="d"
+      Title="软件日志">
+    <Grid>
+        <ScrollViewer>
+            <ikw:SimpleStackPanel Margin="55,20,20,0" Spacing="20">
+            <!-- <ikw:SimpleStackPanel Spacing="20"> -->
+            <!--     <TextBlock Text="任务" FontSize="20"/> -->
+            <!--     <Grid> -->
+            <!--         <Grid.ColumnDefinitions> -->
+            <!--             <ColumnDefinition Width="Auto"/> -->
+            <!--             <ColumnDefinition /> -->
+            <!--         </Grid.ColumnDefinitions> -->
+            <!--         <TextBlock Grid.Row="0" Grid.Column="0" Text="当前任务:"/> -->
+            <!--         <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentTask}" Margin="10,0,0,0"/> -->
+            <!--     </Grid> -->
+            <!--     <Grid> -->
+            <!--         <Grid.RowDefinitions> -->
+            <!--             <RowDefinition Height="20"/> -->
+            <!--             <RowDefinition Height="Auto"/> -->
+            <!--         </Grid.RowDefinitions> -->
+            <!--         <Grid.ColumnDefinitions> -->
+            <!--             <ColumnDefinition Width="Auto"/> -->
+            <!--             <ColumnDefinition /> -->
+            <!--         </Grid.ColumnDefinitions> -->
+            <!--         <TextBlock Text="当前状态:" Grid.Row="0" Grid.Column="0"/> -->
+            <!--         <TextBlock Text="{Binding CurrentState}" Grid.Row="0" Grid.Column="1" Margin="10,0,0,0"/> -->
+            <!--         <TextBlock Text="进度:" Grid.Row="1" Grid.Column="0"/> -->
+            <!--         <ui:ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ProgressValue}" -->
+            <!--                         IsIndeterminate="{Binding IsIndeterminate}" -->
+            <!--                         ShowError="False" -->
+            <!--                         ShowPaused="False"/> -->
+            <!--     </Grid> -->
+            <!--     <ui:InfoBar Title="信息" Message="{Binding Message}" IsOpen="{Binding IsInfoBarOpen}" Margin="0,10,0,0"/> -->
+            <!-- </ikw:SimpleStackPanel> -->
+            <ikw:SimpleStackPanel Spacing="20">
+                <TextBlock Text="日志" FontSize="20"/> 
+                <TextBox Text="{Binding Logs}" TextWrapping="Wrap" VerticalScrollBarVisibility="Visible"
+                       HorizontalScrollBarVisibility="Visible"
+                       IsReadOnly="True"
+                       Margin="0,10,0,0" Height="300"/>
+            </ikw:SimpleStackPanel>
+        </ikw:SimpleStackPanel>
+        </ScrollViewer>
+    </Grid>
+</ui:Page>

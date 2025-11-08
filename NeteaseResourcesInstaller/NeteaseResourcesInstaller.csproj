@@ -8,4 +8,17 @@
         <UseWPF>true</UseWPF>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="iNKORE.UI.WPF" Version="1.2.8" />
+      <PackageReference Include="iNKORE.UI.WPF.Modern" Version="0.10.1" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Resource Include="Resources\pack.png" />
+    </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Resources\" />
+    </ItemGroup>
+
 </Project>
