@@ -7,10 +7,12 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using iNKORE.UI.WPF.Modern.Controls;
 using Microsoft.Win32;
 using Microsoft.Xaml.Behaviors.Media;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using MessageBox = System.Windows.MessageBox;
 using Page = iNKORE.UI.WPF.Modern.Controls.Page;
 
 namespace NeteaseResourcesInstaller.Pages;
@@ -150,6 +152,324 @@ public partial class InstallBedrockResources : Page
         }
     }
 
+    /// <summary>
+    /// 解压指定的子包内容
+    /// </summary>
+    /// <param name="zipFilePath">压缩包路径</param>
+    /// <param name="extractPath">解压路径</param>
+    /// <param name="subpackFolders">要解压的子包文件夹列表</param>
+    private void ExtractMcpackFileWithSubpacks(string zipFilePath, string extractPath, List<string> subpackFolders)
+    {
+        using (var archive = ZipFile.OpenRead(zipFilePath))
+        {
+            // 获取根目录下的所有条目
+            var rootEntries = archive.Entries
+                .Where(e => !string.IsNullOrEmpty(e.FullName) && e.FullName.IndexOf('/') == e.FullName.LastIndexOf('/'))
+                .Select(e => e.FullName.Split('/')[0])
+                .Distinct()
+                .ToList();
+
+            // 如果只有一个根文件夹
+            if (rootEntries.Count == 1 && archive.Entries.All(e => e.FullName.StartsWith(rootEntries[0] + "/")))
+            {
+                // 只解压该文件夹的内容（跳过根文件夹）
+                string rootFolderName = rootEntries[0] + "/";
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.FullName.StartsWith(rootFolderName))
+                    {
+                        // 移除根文件夹名称
+                        string relativePath = entry.FullName.Substring(rootFolderName.Length);
+                        if (string.IsNullOrEmpty(relativePath)) continue;
+
+                        // 检查是否是子包文件夹
+                        bool isSubpackFolder = false;
+                        string entryFolderName = GetFirstFolderInPath(relativePath);
+                        if (!string.IsNullOrEmpty(entryFolderName) && subpackFolders.Contains(entryFolderName))
+                        {
+                            isSubpackFolder = true;
+                        }
+
+                        // 如果不是子包文件夹，或者是我们需要的子包文件夹，则解压
+                        if (!IsSubpackPath(relativePath) || isSubpackFolder || subpackFolders.Count == 0)
+                        {
+                            string destinationPath = Path.Combine(extractPath, relativePath);
+
+                            if (entry.FullName.EndsWith("/"))
+                            {
+                                // 创建目录
+                                Directory.CreateDirectory(destinationPath);
+                            }
+                            else
+                            {
+                                // 创建目录（如果不存在）
+                                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                                // 解压文件
+                                entry.ExtractToFile(destinationPath, true);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 正常解压所有内容
+                Directory.CreateDirectory(extractPath);
+                foreach (var entry in archive.Entries)
+                {
+                    // 检查是否是子包文件夹
+                    bool isSubpackFolder = false;
+                    string entryFolderName = GetFirstFolderInPath(entry.FullName);
+                    if (!string.IsNullOrEmpty(entryFolderName) && subpackFolders.Contains(entryFolderName))
+                    {
+                        isSubpackFolder = true;
+                    }
+
+                    // 如果不是子包文件夹，或者是我们需要的子包文件夹，则解压
+                    if (!IsSubpackPath(entry.FullName) || isSubpackFolder || subpackFolders.Count == 0)
+                    {
+                        string destinationPath = Path.Combine(extractPath, entry.FullName);
+
+                        if (entry.FullName.EndsWith("/"))
+                        {
+                            // 创建目录
+                            Directory.CreateDirectory(destinationPath);
+                        }
+                        else
+                        {
+                            // 创建目录（如果不存在）
+                            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                            // 解压文件
+                            entry.ExtractToFile(destinationPath, true);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 解压指定的单个子包内容
+    /// </summary>
+    /// <param name="zipFilePath">压缩包路径</param>
+    /// <param name="extractPath">解压路径</param>
+    /// <param name="selectedSubpackFolder">要解压的子包文件夹名</param>
+    private void ExtractMcpackFileWithSelectedSubpack(string zipFilePath, string extractPath, string selectedSubpackFolder)
+    {
+        using (var archive = ZipFile.OpenRead(zipFilePath))
+        {
+            // 获取根目录下的所有条目
+            var rootEntries = archive.Entries
+                .Where(e => !string.IsNullOrEmpty(e.FullName) && e.FullName.IndexOf('/') == e.FullName.LastIndexOf('/'))
+                .Select(e => e.FullName.Split('/')[0])
+                .Distinct()
+                .ToList();
+
+            // 如果只有一个根文件夹
+            if (rootEntries.Count == 1 && archive.Entries.All(e => e.FullName.StartsWith(rootEntries[0] + "/")))
+            {
+                // 只解压该文件夹的内容（跳过根文件夹）
+                string rootFolderName = rootEntries[0] + "/";
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.FullName.StartsWith(rootFolderName))
+                    {
+                        // 移除根文件夹名称
+                        string relativePath = entry.FullName.Substring(rootFolderName.Length);
+                        if (string.IsNullOrEmpty(relativePath)) continue;
+
+                        // 检查是否是选中的子包文件（在subpacks目录下）
+                        bool isSubpackFile = relativePath.StartsWith($"subpacks/{selectedSubpackFolder}/");
+
+                        // 解压条件：
+                        // 1. 不在subpacks目录下的文件（根目录文件和其他非subpacks目录文件）
+                        // 2. 属于选中子包的文件
+                        if (!relativePath.StartsWith("subpacks/") || isSubpackFile)
+                        {
+                            string destinationPath = Path.Combine(extractPath, relativePath);
+
+                            // 处理subpacks路径，将其展开到根目录
+                            if (isSubpackFile)
+                            {
+                                // 移除 "subpacks/{selectedSubpackFolder}/" 前缀，将子包内容展开到根目录
+                                string subpackRelativePath = relativePath.Substring($"subpacks/{selectedSubpackFolder}/".Length);
+                                destinationPath = Path.Combine(extractPath, subpackRelativePath);
+                            }
+
+                            if (entry.FullName.EndsWith("/"))
+                            {
+                                // 创建目录
+                                Directory.CreateDirectory(destinationPath);
+                            }
+                            else
+                            {
+                                // 创建目录（如果不存在）
+                                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                                // 解压文件
+                                entry.ExtractToFile(destinationPath, true);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 正常解压所有内容
+                Directory.CreateDirectory(extractPath);
+                foreach (var entry in archive.Entries)
+                {
+                    // 检查是否是选中的子包文件（在subpacks目录下）
+                    bool isSubpackFile = entry.FullName.StartsWith($"subpacks/{selectedSubpackFolder}/");
+
+                    // 解压条件：
+                    // 1. 不在subpacks目录下的文件（根目录文件和其他非subpacks目录文件）
+                    // 2. 属于选中子包的文件
+                    if (!entry.FullName.StartsWith("subpacks/") || isSubpackFile)
+                    {
+                        string destinationPath = Path.Combine(extractPath, entry.FullName);
+
+                        // 处理subpacks路径，将其展开到根目录
+                        if (isSubpackFile)
+                        {
+                            // 移除 "subpacks/{selectedSubpackFolder}/" 前缀，将子包内容展开到根目录
+                            string subpackRelativePath = entry.FullName.Substring($"subpacks/{selectedSubpackFolder}/".Length);
+                            destinationPath = Path.Combine(extractPath, subpackRelativePath);
+                        }
+
+                        if (entry.FullName.EndsWith("/"))
+                        {
+                            // 创建目录
+                            Directory.CreateDirectory(destinationPath);
+                        }
+                        else
+                        {
+                            // 创建目录（如果不存在）
+                            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                            // 解压文件
+                            entry.ExtractToFile(destinationPath, true);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// 解压不包含子包的资源包
+    /// </summary>
+    /// <param name="zipFilePath">压缩包路径</param>
+    /// <param name="extractPath">解压路径</param>
+    private void ExtractMcpackFileWithoutSubpacks(string zipFilePath, string extractPath)
+    {
+        using (var archive = ZipFile.OpenRead(zipFilePath))
+        {
+            // 获取根目录下的所有条目
+            var rootEntries = archive.Entries
+                .Where(e => !string.IsNullOrEmpty(e.FullName) && e.FullName.IndexOf('/') == e.FullName.LastIndexOf('/'))
+                .Select(e => e.FullName.Split('/')[0])
+                .Distinct()
+                .ToList();
+
+            // 如果只有一个根文件夹
+            if (rootEntries.Count == 1 && archive.Entries.All(e => e.FullName.StartsWith(rootEntries[0] + "/")))
+            {
+                // 只解压该文件夹的内容（跳过根文件夹）
+                string rootFolderName = rootEntries[0] + "/";
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.FullName.StartsWith(rootFolderName))
+                    {
+                        // 移除根文件夹名称
+                        string relativePath = entry.FullName.Substring(rootFolderName.Length);
+                        if (string.IsNullOrEmpty(relativePath)) continue;
+
+                        // 跳过子包文件夹
+                        string entryFolderName = GetFirstFolderInPath(relativePath);
+                        if (!string.IsNullOrEmpty(entryFolderName) && IsSubpackFolder(entryFolderName, zipFilePath, rootFolderName))
+                        {
+                            continue; // 跳过子包文件夹
+                        }
+
+                        string destinationPath = Path.Combine(extractPath, relativePath);
+
+                        if (entry.FullName.EndsWith("/"))
+                        {
+                            // 创建目录
+                            Directory.CreateDirectory(destinationPath);
+                        }
+                        else
+                        {
+                            // 创建目录（如果不存在）
+                            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                            // 解压文件
+                            entry.ExtractToFile(destinationPath, true);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // 正常解压非子包内容
+                Directory.CreateDirectory(extractPath);
+                foreach (var entry in archive.Entries)
+                {
+                    // 跳过子包文件夹
+                    string entryFolderName = GetFirstFolderInPath(entry.FullName);
+                    if (!string.IsNullOrEmpty(entryFolderName) && IsSubpackFolder(entryFolderName, zipFilePath))
+                    {
+                        continue; // 跳过子包文件夹
+                    }
+
+                    string destinationPath = Path.Combine(extractPath, entry.FullName);
+
+                    if (entry.FullName.EndsWith("/"))
+                    {
+                        // 创建目录
+                        Directory.CreateDirectory(destinationPath);
+                    }
+                    else
+                    {
+                        // 创建目录（如果不存在）
+                        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                        // 解压文件
+                        entry.ExtractToFile(destinationPath, true);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 判断路径是否为子包路径
+    /// </summary>
+    /// <param name="path">路径</param>
+    /// <returns>是否为子包路径</returns>
+    private bool IsSubpackPath(string path)
+    {
+        return !string.IsNullOrEmpty(path) && !path.StartsWith("manifest.json") && path.Contains("/") && !path.StartsWith("pack_icon.png");
+    }
+
+    /// <summary>
+    /// 获取路径中的第一个文件夹
+    /// </summary>
+    /// <param name="path">路径</param>
+    /// <returns>第一个文件夹名称</returns>
+    private string GetFirstFolderInPath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+
+        int firstSlashIndex = path.IndexOf('/');
+        if (firstSlashIndex <= 0)
+            return null;
+
+        return path.Substring(0, firstSlashIndex);
+    }
+
     private BitmapImage LoadDefaultThumbnail()
     {
         try
@@ -194,6 +514,13 @@ public partial class InstallBedrockResources : Page
                 }
 
                 JObject jManifest = JObject.Parse(File.ReadAllText(Path.Combine(currectResourcePath, "manifest.json")));
+                
+                // 检查是否有subpacks字段
+                if (jManifest.ContainsKey("subpacks") && jManifest["subpacks"] is JArray subpacks && subpacks.Count > 0)
+                {
+                    Function.AddLog("检测到资源包包含子包");
+                }
+                
                 Function.AddLog("读取资源包Header信息");
                 string name = jManifest["header"]["name"].ToString();
                 string description = jManifest["header"]["description"].ToString();
@@ -248,7 +575,7 @@ public partial class InstallBedrockResources : Page
             };
             if (selectMcpackDialog.ShowDialog() == true)
             {
-                Task.Run(() =>
+                Task.Run(async () =>
                 {
                     // Extract File
                     if (!Directory.Exists(ResourcePath))
@@ -261,45 +588,110 @@ public partial class InstallBedrockResources : Page
                         Path.GetFileNameWithoutExtension(selectMcpackDialog.FileName));
                     Function.AddLog($"解压资源: {selectMcpackDialog.FileName}");
 
-                    // 检查ZIP文件结构并解压
-                    ExtractMcpackFile(selectMcpackDialog.FileName, currectResourcePath);
+                    // 不预先解压，等待子包选择后再处理
 
-                    Function.AddLog("解压完毕!");
                     Function.AddLog("检查是否存在 manifest.json 文件");
-                    if (!File.Exists(Path.Combine(currectResourcePath, "manifest.json")))
+                    // 从压缩包中直接读取manifest.json文件
+                    JObject jManifest;
+                    using (var archive = ZipFile.OpenRead(selectMcpackDialog.FileName))
                     {
-                        throw new Exception("不是有效的资源包: manifest.json不存在");
-                    }
+                        // 查找根目录下的manifest.json文件
+                        var manifestEntry = archive.Entries.FirstOrDefault(e => 
+                            e.FullName.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) || 
+                            e.FullName.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase) && 
+                            e.FullName.Split('/').Length == 2);
 
-                    JObject jManifest =
-                        JObject.Parse(File.ReadAllText(Path.Combine(currectResourcePath, "manifest.json")));
-                    Function.AddLog("读取资源包Header信息");
-                    string name = jManifest["header"]["name"].ToString();
-                    string description = jManifest["header"]["description"].ToString();
-                    Function.AddLog($"资源包名称: {name}");
-                    Function.AddLog($"资源包描述: {description}");
-                    // contents.json to empty
-                    // File.WriteAllText(Path.Combine(currectResourcePath, "contents.json"), "{}");
-                    // if (Directory.Exists(Path.Combine(currectResourcePath, "ui")))
-                    // {
-                    //     File.WriteAllText(Path.Combine(currectResourcePath,"ui" , "contents.json"), "{}");
-                    // }
+                        // 如果没有找到根目录下的manifest.json，尝试查找任何位置的manifest.json
+                        manifestEntry ??= archive.Entries.FirstOrDefault(e => 
+                            e.Name.Equals("manifest.json", StringComparison.OrdinalIgnoreCase));
 
-                    // 使用Dispatcher更新UI
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        var newItem = new ResourceItem
+                        if (manifestEntry == null)
                         {
-                            Title = name,
-                            FolderName = Path.GetFileName(currectResourcePath),
-                            Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png"))
-                                ? BytesToBitmapImage(
-                                    File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png")))
-                                : LoadDefaultThumbnail(),
-                            Description = description
-                        };
-                        _resourceItems.Add(newItem);
-                    });
+                            throw new Exception("不是有效的资源包: manifest.json不存在");
+                        }
+
+                        using (var reader = new StreamReader(manifestEntry.Open()))
+                        {
+                            string manifestContent = reader.ReadToEnd();
+                            jManifest = JObject.Parse(manifestContent);
+                        }
+                    }
+        
+                    // 检查是否有subpacks字段
+                    if (jManifest.ContainsKey("subpacks") && jManifest["subpacks"] is JArray subpacks && subpacks.Count > 0)
+                    {
+                        // 显示子包选择对话框
+                        Application.Current.Dispatcher.Invoke(async () =>
+                        {
+                            var dialog = new SubpackSelectionDialog(subpacks);
+                            var result = await dialog.ShowAsync();
+                            
+                            if (result == ContentDialogResult.Primary)
+                            {
+                                dialog.ContentDialog_PrimaryButtonClick();
+                                // 确保目录存在
+                                if (!Directory.Exists(currectResourcePath))
+                                {
+                                    Directory.CreateDirectory(currectResourcePath);
+                                }
+                                
+                                if (dialog.SelectedSubpack == null)
+                                {
+                                    // 不使用子包，解压时不包含子包内容
+                                    ExtractMcpackFileWithoutSubpacks(selectMcpackDialog.FileName, currectResourcePath);
+                                    Function.AddLog("已选择不使用子包");
+                                    
+                                    // 继续处理资源包
+                                    ProcessResourceManifest(jManifest, currectResourcePath);
+                                }
+                                else
+                                {
+                                    string selectedFolder = dialog.SelectedSubpack["folder_name"].ToString();
+                                    if (!string.IsNullOrEmpty(selectedFolder))
+                                    {
+                                        Function.AddLog($"将要处理选中的子包: {selectedFolder}");
+                                        
+                                        // 解压时包含选中的子包
+                                        ExtractMcpackFileWithSelectedSubpack(selectMcpackDialog.FileName, currectResourcePath, selectedFolder);
+                                        
+                                        Function.AddLog($"已处理选中的子包: {selectedFolder}");
+                                    }
+                                    else
+                                    {
+                                        // 没有选中特定子包或索引无效，按不使用子包处理
+                                        ExtractMcpackFileWithoutSubpacks(selectMcpackDialog.FileName, currectResourcePath);
+                                        Function.AddLog("未正确选择子包或子包索引无效，按不使用子包处理");
+                                    }
+                                    
+                                    // 继续处理资源包
+                                    ProcessResourceManifest(jManifest, currectResourcePath);
+                                }
+                            }
+                            else
+                            {
+                                // 用户取消操作
+                                if (Directory.Exists(currectResourcePath))
+                                {
+                                    Directory.Delete(currectResourcePath, true);
+                                }
+                                return;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        // 没有子包，正常解压
+                        ExtractMcpackFile(selectMcpackDialog.FileName, currectResourcePath);
+                        
+                        // 检查是否存在 manifest.json 文件
+                        // if (!File.Exists(Path.Combine(currectResourcePath, "manifest.json")))
+                        // {
+                        //     throw new Exception("不是有效的资源包: manifest.json不存在");
+                        // }
+                        
+                        // 继续处理资源包
+                        ProcessResourceManifest(jManifest, currectResourcePath);
+                    }
                 });
             }
         }
@@ -315,6 +707,42 @@ public partial class InstallBedrockResources : Page
         //     Description = "这是一个示例材质包描述。"
         // };
         // _resourceItems.Add(newItem);
+    }
+
+    /// <summary>
+    /// 处理资源包的manifest文件并更新UI
+    /// </summary>
+    /// <param name="jManifest">manifest对象</param>
+    /// <param name="currectResourcePath">资源包路径</param>
+    private void ProcessResourceManifest(JObject jManifest, string currectResourcePath)
+    {
+        Function.AddLog("读取资源包Header信息");
+        string name = jManifest["header"]["name"].ToString();
+        string description = jManifest["header"]["description"].ToString();
+        Function.AddLog($"资源包名称: {name}");
+        Function.AddLog($"资源包描述: {description}");
+        // contents.json to empty
+        // File.WriteAllText(Path.Combine(currectResourcePath, "contents.json"), "{}");
+        // if (Directory.Exists(Path.Combine(currectResourcePath, "ui")))
+        // {
+        //     File.WriteAllText(Path.Combine(currectResourcePath,"ui" , "contents.json"), "{}");
+        // }
+
+        // 使用Dispatcher更新UI
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var newItem = new ResourceItem
+            {
+                Title = name,
+                FolderName = Path.GetFileName(currectResourcePath),
+                Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png"))
+                    ? BytesToBitmapImage(
+                        File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png")))
+                    : LoadDefaultThumbnail(),
+                Description = description
+            };
+            _resourceItems.Add(newItem);
+        });
     }
 
     private void DeleteResource_OnClick(object sender, RoutedEventArgs e)
@@ -1536,6 +1964,52 @@ public partial class InstallBedrockResources : Page
         {
             Function.AddLog($"合并特殊JSON文件 {relativePath} 时出错: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 判断文件夹是否为子包文件夹
+    /// </summary>
+    /// <param name="folderName">文件夹名称</param>
+    /// <param name="zipFilePath">压缩包路径</param>
+    /// <param name="rootFolderName">根文件夹名称（如果有的话，以"/"结尾）</param>
+    /// <returns>是否为子包文件夹</returns>
+    private bool IsSubpackFolder(string folderName, string zipFilePath, string rootFolderName = "")
+    {
+        try
+        {
+            using (var archive = ZipFile.OpenRead(zipFilePath))
+            {
+                // 构建manifest.json的可能路径
+                string manifestPath = string.IsNullOrEmpty(rootFolderName) 
+                    ? "manifest.json" 
+                    : $"{rootFolderName}manifest.json";
+
+                // 查找manifest.json
+                var manifestEntry = archive.Entries.FirstOrDefault(e => e.FullName == manifestPath);
+                if (manifestEntry == null) return false;
+
+                // 读取manifest.json
+                using (var reader = new StreamReader(manifestEntry.Open()))
+                {
+                    string manifestContent = reader.ReadToEnd();
+                    JObject manifest = JObject.Parse(manifestContent);
+
+                    // 检查是否有subpacks字段且包含当前文件夹
+                    if (manifest.ContainsKey("subpacks") && manifest["subpacks"] is JArray subpacks)
+                    {
+                        return subpacks.Any(subpack => 
+                            subpack is JObject subpackObj && 
+                            subpackObj["folder_name"]?.ToString() == folderName);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Function.AddLog($"检查子包文件夹时出错: {ex.Message}");
+        }
+
+        return false;
     }
 
     private void RestoreResources_OnClick(object sender, RoutedEventArgs e)

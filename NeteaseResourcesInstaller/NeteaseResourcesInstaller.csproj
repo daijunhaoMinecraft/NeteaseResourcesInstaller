@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
@@ -19,6 +19,13 @@
     </ItemGroup>
     <ItemGroup>
       <Folder Include="Resources\" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Page Update="Pages\SubpackSelectionDialog.xaml">
+        <Generator>MSBuild:Compile</Generator>
+        <SubType>Designer</SubType>
+      </Page>
     </ItemGroup>
 
 </Project>

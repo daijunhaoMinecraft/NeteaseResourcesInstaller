@@ -9,7 +9,7 @@
         ui:WindowHelper.UseModernWindowStyle="True"
         Loaded="MainWindow_OnLoaded"
         mc:Ignorable="d"
-        Title="MainWindow" Height="800" Width="1200">
+        Title="Netease Bedrock Resources Installer" Height="800" Width="1200">
     <Grid>
         <ui:NavigationView x:Name="NavigationView_Root" IsPaneOpen="False" SelectionChanged="NavigationView_SelectionChanged" IsTitleBarAutoPaddingEnabled="True" IsSettingsVisible="True">
             <ui:NavigationView.MenuItems>

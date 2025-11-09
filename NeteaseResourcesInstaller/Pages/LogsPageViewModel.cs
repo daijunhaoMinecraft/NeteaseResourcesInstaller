@@ -89,4 +89,22 @@ public class LogsPageViewModel : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+    
+    /// <summary>
+    /// 添加日志信息
+    /// </summary>
+    /// <param name="message">日志内容</param>
+    public void AddLog(string message)
+    {
+        string time = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        Logs += $"[{time}] {message}\n";
+    }
+    
+    /// <summary>
+    /// 清空日志
+    /// </summary>
+    public void ClearLogs()
+    {
+        Logs = "";
+    }
 }
