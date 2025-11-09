@@ -36,6 +36,48 @@ public partial class InstallBedrockResources : Page
     private ObservableCollection<ResourceItem> _resourceItems = new ObservableCollection<ResourceItem>();
     public static string ResourcePath = string.Empty;
 
+    List<string> NeedToDelete = new List<string>
+    {
+        "ui\\hud_screen.json",
+        "ui\\inventory_screen.json",
+        "ui\\inventory_screen_pocket.json",
+        "ui\\pause_screen.json",
+        "ui\\settings_screen.json",
+        "ui\\enchanting_screen.json",
+        "ui\\enchanting_screen_pocket.json",
+        "ui\\trade_screen.json",
+        "ui\\how_to_play_screen.json",
+        "ui\\progress_screen.json",
+        "ui\\permissions_screen.json",
+        "ui\\reconnect_screen.json",
+        //"ui\\ui_template_buttons.json",
+        //"ui\\_ui_defs.json",
+        "ui\\contents.json", // 原版有，但通常允许覆盖；如果你不修改它，建议删掉
+        "ui\\player_tips.json", // 原版 1.19+ 引入了此文件
+        "ui\\emote_wheel.json", // 原版基岩版已内置表情轮盘（1.16+）
+        "ui\\emote_screen.json", // 原版有基础 emote UI
+        //"chatExtensionMainScreenMsg.json", // 这个需要谨慎：原版无此命名，但基础 chat_screen.json 是原版的
+        // 与RainBowPie冲突文件(包括但不限于手机版的房间管理/成就系统)
+        "ui\\AchievementGate.json",
+        "ui\\AchievementSys.json",
+        "ui\\emote_two_person.json",
+        "ui\\lobby_setting_screen.json",
+        //"ui\\mountUI.json",
+        "ui\\PE_AchievementSys.json",
+        "ui\\PopWindow.json",
+        "ui\\researchPopUI.json",
+        "ui\\researchResponseUI.json",
+        "ui\\researchUI.json",
+        "ui\\encyclopedia_screen.json",
+        "textures\\ui\\title.png" // 标题可能会与RainbowPIE冲突
+    };
+
+    private List<string> MustToDelete = new List<string>
+    {
+        "contents.json",
+        "ui\\contents.json"
+    };
+
     #endregion
 
     #region function
@@ -56,6 +98,7 @@ public partial class InstallBedrockResources : Page
             return bitmap;
         }
     }
+
     private void ExtractMcpackFile(string zipFilePath, string extractPath)
     {
         using (var archive = ZipFile.OpenRead(zipFilePath))
@@ -72,7 +115,7 @@ public partial class InstallBedrockResources : Page
             {
                 // 只解压该文件夹的内容（跳过根文件夹）
                 string rootFolderName = rootEntries[0] + "/";
-                
+
                 foreach (var entry in archive.Entries)
                 {
                     if (entry.FullName.StartsWith(rootFolderName))
@@ -80,9 +123,9 @@ public partial class InstallBedrockResources : Page
                         // 移除根文件夹名称
                         string relativePath = entry.FullName.Substring(rootFolderName.Length);
                         if (string.IsNullOrEmpty(relativePath)) continue;
-                        
+
                         string destinationPath = Path.Combine(extractPath, relativePath);
-                        
+
                         if (entry.FullName.EndsWith("/"))
                         {
                             // 创建目录
@@ -106,9 +149,10 @@ public partial class InstallBedrockResources : Page
             }
         }
     }
+
     private BitmapImage LoadDefaultThumbnail()
     {
-        try 
+        try
         {
             // 方式1：从资源文件加载
             Uri resourceUri = new Uri("pack://application:,,,/Resources/pack.png");
@@ -121,6 +165,7 @@ public partial class InstallBedrockResources : Page
             // 处理加载失败情况
             Console.WriteLine($"Failed to load image: {ex.Message}");
         }
+
         return null;
     }
 
@@ -135,6 +180,7 @@ public partial class InstallBedrockResources : Page
                 Directory.CreateDirectory(ResourcePath);
                 return;
             }
+
             Function.AddLog("读取已经解压好的资源..");
             // 获取文件夹列表
             string[] resourceFolders = Directory.GetDirectories(ResourcePath);
@@ -146,6 +192,7 @@ public partial class InstallBedrockResources : Page
                 {
                     throw new Exception("不是有效的资源包: manifest.json不存在");
                 }
+
                 JObject jManifest = JObject.Parse(File.ReadAllText(Path.Combine(currectResourcePath, "manifest.json")));
                 Function.AddLog("读取资源包Header信息");
                 string name = jManifest["header"]["name"].ToString();
@@ -156,13 +203,16 @@ public partial class InstallBedrockResources : Page
                 File.WriteAllText(Path.Combine(currectResourcePath, "contents.json"), "{}");
                 if (Directory.Exists(Path.Combine(currectResourcePath, "ui")))
                 {
-                    File.WriteAllText(Path.Combine(currectResourcePath,"ui" , "contents.json"), "{}");
+                    File.WriteAllText(Path.Combine(currectResourcePath, "ui", "contents.json"), "{}");
                 }
+
                 var newItem = new ResourceItem
                 {
                     Title = name,
                     FolderName = Path.GetFileName(currectResourcePath),
-                    Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png")) ? BytesToBitmapImage(File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png"))) : LoadDefaultThumbnail(),
+                    Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png"))
+                        ? BytesToBitmapImage(File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png")))
+                        : LoadDefaultThumbnail(),
                     Description = description
                 };
                 _resourceItems.Add(newItem);
@@ -174,8 +224,6 @@ public partial class InstallBedrockResources : Page
             Function.ShowDialog($"读取资源包时出现错误:{e.Message}", "错误");
         }
     }
-
-
 
     #endregion
 
@@ -212,29 +260,31 @@ public partial class InstallBedrockResources : Page
                     string currectResourcePath = Path.Combine(ResourcePath,
                         Path.GetFileNameWithoutExtension(selectMcpackDialog.FileName));
                     Function.AddLog($"解压资源: {selectMcpackDialog.FileName}");
-                
+
                     // 检查ZIP文件结构并解压
                     ExtractMcpackFile(selectMcpackDialog.FileName, currectResourcePath);
-                
+
                     Function.AddLog("解压完毕!");
                     Function.AddLog("检查是否存在 manifest.json 文件");
                     if (!File.Exists(Path.Combine(currectResourcePath, "manifest.json")))
                     {
                         throw new Exception("不是有效的资源包: manifest.json不存在");
                     }
-                    JObject jManifest = JObject.Parse(File.ReadAllText(Path.Combine(currectResourcePath, "manifest.json")));
+
+                    JObject jManifest =
+                        JObject.Parse(File.ReadAllText(Path.Combine(currectResourcePath, "manifest.json")));
                     Function.AddLog("读取资源包Header信息");
                     string name = jManifest["header"]["name"].ToString();
                     string description = jManifest["header"]["description"].ToString();
                     Function.AddLog($"资源包名称: {name}");
                     Function.AddLog($"资源包描述: {description}");
                     // contents.json to empty
-                    File.WriteAllText(Path.Combine(currectResourcePath, "contents.json"), "{}");
-                    if (Directory.Exists(Path.Combine(currectResourcePath, "ui")))
-                    {
-                        File.WriteAllText(Path.Combine(currectResourcePath,"ui" , "contents.json"), "{}");
-                    }
-                    
+                    // File.WriteAllText(Path.Combine(currectResourcePath, "contents.json"), "{}");
+                    // if (Directory.Exists(Path.Combine(currectResourcePath, "ui")))
+                    // {
+                    //     File.WriteAllText(Path.Combine(currectResourcePath,"ui" , "contents.json"), "{}");
+                    // }
+
                     // 使用Dispatcher更新UI
                     Application.Current.Dispatcher.Invoke(() =>
                     {
@@ -242,7 +292,10 @@ public partial class InstallBedrockResources : Page
                         {
                             Title = name,
                             FolderName = Path.GetFileName(currectResourcePath),
-                            Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png")) ? BytesToBitmapImage(File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png"))) : LoadDefaultThumbnail(),
+                            Thumbnail = File.Exists(Path.Combine(currectResourcePath, "pack_icon.png"))
+                                ? BytesToBitmapImage(
+                                    File.ReadAllBytes(Path.Combine(currectResourcePath, "pack_icon.png")))
+                                : LoadDefaultThumbnail(),
                             Description = description
                         };
                         _resourceItems.Add(newItem);
@@ -303,11 +356,11 @@ public partial class InstallBedrockResources : Page
                     continue; // 继续删除其他选中的资源包
                 }
             }
-            
+
             // 从列表中移除
             _resourceItems.Remove(item);
         }
-        
+
         Function.AddLog($"成功删除 {toRemove.Count} 个资源包");
     }
 
@@ -320,6 +373,7 @@ public partial class InstallBedrockResources : Page
     {
         MoveSelectedBlocks(up: false);
     }
+
     private void MoveSelectedBlocks(bool up)
     {
         if (ResourcesList.SelectedItems.Count == 0) return;
@@ -480,7 +534,8 @@ public partial class InstallBedrockResources : Page
                     return;
                 }
 
-                string vanillaResourcePath = Path.Combine(SettingsPage.pBedrockPath, SettingsPage.selectBedrockFolder, "data", "resource_packs", "vanilla_netease");
+                string vanillaResourcePath = Path.Combine(SettingsPage.pBedrockPath, SettingsPage.selectBedrockFolder,
+                    "data", "resource_packs", "vanilla_netease");
                 if (!Directory.Exists(vanillaResourcePath))
                 {
                     Function.AddLog("基岩版原版资源包目录不存在，请检查设置是否正确");
@@ -511,10 +566,7 @@ public partial class InstallBedrockResources : Page
             catch (Exception ex)
             {
                 Function.AddLog($"安装过程中发生错误: {ex.Message}");
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Function.ShowDialog($"安装过程中发生错误: {ex.Message}", "错误");
-                });
+                Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog($"安装过程中发生错误: {ex.Message}", "错误"); });
             }
         });
     }
@@ -568,7 +620,7 @@ public partial class InstallBedrockResources : Page
                     {
                         File.Delete(filePath);
                         Function.AddLog($"已删除添加的文件: {addedFile}");
-                        
+
                         // 删除空目录
                         TryDeleteEmptyDirectories(Path.GetDirectoryName(filePath), vanillaPath);
                     }
@@ -604,7 +656,8 @@ public partial class InstallBedrockResources : Page
     /// <param name="basePath">基础路径，防止删除基础目录</param>
     private void TryDeleteEmptyDirectories(string dirPath, string basePath)
     {
-        if (string.IsNullOrEmpty(dirPath) || !Directory.Exists(dirPath) || dirPath.Equals(basePath, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrEmpty(dirPath) || !Directory.Exists(dirPath) ||
+            dirPath.Equals(basePath, StringComparison.OrdinalIgnoreCase))
             return;
 
         // 检查目录是否为空
@@ -614,7 +667,7 @@ public partial class InstallBedrockResources : Page
             {
                 Directory.Delete(dirPath);
                 Function.AddLog($"已删除空目录: {dirPath}");
-                
+
                 // 递归检查父目录
                 TryDeleteEmptyDirectories(Path.GetDirectoryName(dirPath), basePath);
             }
@@ -638,27 +691,24 @@ public partial class InstallBedrockResources : Page
             {
                 return ResourcesList.SelectedItems.Cast<ResourceItem>().ToList();
             });
-            
+
             if (selectedItems.Count == 0)
             {
                 Function.AddLog("请选择要安装的资源包");
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Function.ShowDialog("请选择要安装的资源包", "提示");
-                });
+                Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog("请选择要安装的资源包", "提示"); });
                 return;
             }
 
             // 创建ResourceConfig目录结构
             string resourceConfigDir = Path.Combine(vanillaPath, "ResourceConfig");
             string originalFilesDir = Path.Combine(resourceConfigDir, "OriginalFiles");
-            
+
             // 如果目录已存在，先删除
             if (Directory.Exists(resourceConfigDir))
             {
                 Directory.Delete(resourceConfigDir, true);
             }
-            
+
             Directory.CreateDirectory(resourceConfigDir);
             Directory.CreateDirectory(originalFilesDir);
 
@@ -672,6 +722,7 @@ public partial class InstallBedrockResources : Page
             {
                 Directory.Delete(cacheDir, true);
             }
+
             Directory.CreateDirectory(cacheDir);
 
             try
@@ -692,8 +743,8 @@ public partial class InstallBedrockResources : Page
 
                 // 然后将缓存目录中的文件与目标目录合并
                 Function.AddLog("正在合并所有资源包到游戏目录...");
-                ProcessCachedResources(cacheDir, vanillaPath, resourceConfigDir, originalFilesDir, fileMappings, addFiles);
-
+                ProcessCachedResources(cacheDir, vanillaPath, resourceConfigDir, originalFilesDir, fileMappings,
+                    addFiles);
                 // 保存Restore.json文件
                 restoreData["AddFile"] = addFiles;
                 restoreData["FileMappings"] = fileMappings;
@@ -705,10 +756,7 @@ public partial class InstallBedrockResources : Page
                 File.Create(installedFlagPath).Dispose();
 
                 Function.AddLog("资源包安装完成");
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Function.ShowDialog("资源包安装完成", "提示");
-                });
+                Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog("资源包安装完成", "提示"); });
             }
             finally
             {
@@ -722,10 +770,7 @@ public partial class InstallBedrockResources : Page
         catch (Exception ex)
         {
             Function.AddLog($"安装过程中发生错误: {ex.Message}");
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                Function.ShowDialog($"安装过程中发生错误: {ex.Message}", "错误");
-            });
+            Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog($"安装过程中发生错误: {ex.Message}", "错误"); });
         }
     }
 
@@ -737,7 +782,7 @@ public partial class InstallBedrockResources : Page
     private void MergeResourceToCache(string resourcePath, string cacheDir)
     {
         string[] files = Directory.GetFiles(resourcePath, "*.*", SearchOption.AllDirectories);
-        
+
         foreach (string file in files)
         {
             try
@@ -846,7 +891,7 @@ public partial class InstallBedrockResources : Page
         {
             // 读取源文件
             Dictionary<string, string> sourceLangEntries = ParseLangFile(sourceFile);
-            
+
             // 读取目标文件
             Dictionary<string, string> targetLangEntries = ParseLangFile(targetFile);
 
@@ -874,10 +919,54 @@ public partial class InstallBedrockResources : Page
     /// <param name="originalFilesDir">原始文件备份目录</param>
     /// <param name="fileMappings">文件映射关系</param>
     /// <param name="addFiles">新增文件列表</param>
-    private void ProcessCachedResources(string cacheDir, string vanillaPath, string resourceConfigDir, string originalFilesDir, JObject fileMappings, JArray addFiles)
+    private void ProcessCachedResources(string cacheDir, string vanillaPath, string resourceConfigDir,
+        string originalFilesDir, JObject fileMappings, JArray addFiles)
     {
         string[] files = Directory.GetFiles(cacheDir, "*.*", SearchOption.AllDirectories);
+        // 文件删除工作
+        if (SettingsPage.deleteDuplicate)
+        {
+            foreach (string needtoDel in NeedToDelete)
+            {
+                string relativePath = needtoDel; // 获取相对路径
+                string targetPath = Path.Combine(vanillaPath, relativePath);
         
+                if (File.Exists(Path.Combine(vanillaPath, needtoDel)))
+                {
+                    if (File.Exists(targetPath) && !fileMappings.ContainsKey(relativePath))
+                    {
+                        string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
+                        string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
+        
+                        File.Copy(targetPath, backupPath, true);
+                        fileMappings[relativePath] = uniqueBackupName;
+                    }
+                    //Console.WriteLine(targetPath);
+                    File.Delete(targetPath);
+                    Function.AddLog($"[解决冲突]已删除文件: {relativePath}");
+                }
+            }
+        }
+        foreach (string needtoDel in MustToDelete)
+        {
+            string relativePath = needtoDel; // 获取相对路径
+            string targetPath = Path.Combine(vanillaPath, relativePath);
+        
+            if (File.Exists(Path.Combine(vanillaPath, needtoDel)))
+            {
+                if (File.Exists(targetPath) && !fileMappings.ContainsKey(relativePath))
+                {
+                    string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
+                    string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
+        
+                    File.Copy(targetPath, backupPath, true);
+                    fileMappings[relativePath] = uniqueBackupName;
+                }
+                //Console.WriteLine(targetPath);
+                File.Delete(targetPath);
+                Function.AddLog($"[Must]已删除文件: {relativePath}");
+            }
+        }
         foreach (string file in files)
         {
             try
@@ -885,7 +974,6 @@ public partial class InstallBedrockResources : Page
                 string relativePath = file.Substring(cacheDir.Length + 1); // 获取相对路径
                 string targetPath = Path.Combine(vanillaPath, relativePath);
                 string targetDir = Path.GetDirectoryName(targetPath);
-
                 // 确保目标目录存在
                 if (!Directory.Exists(targetDir))
                 {
@@ -910,7 +998,7 @@ public partial class InstallBedrockResources : Page
                     {
                         string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
                         string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
-                        
+
                         File.Copy(targetPath, backupPath, true);
                         fileMappings[relativePath] = uniqueBackupName;
                     }
@@ -919,8 +1007,9 @@ public partial class InstallBedrockResources : Page
                         // 如果是新增文件，记录到AddFile列表
                         addFiles.Add(relativePath);
                     }
+
                     File.Copy(file, targetPath, true);
-                    Function.AddLog($"已复制文件: {relativePath}");
+                    //Function.AddLog($"已复制文件: {relativePath}");
                 }
             }
             catch (Exception ex)
@@ -962,68 +1051,70 @@ public partial class InstallBedrockResources : Page
     /// <param name="originalFilesDir">原始文件备份目录</param>
     /// <param name="fileMappings">文件映射关系</param>
     /// <param name="addFiles">新增文件列表</param>
-    private void ProcessResourceDirectory(string resourcePath, string vanillaPath, string resourceConfigDir, string originalFilesDir, JObject fileMappings, JArray addFiles)
-    {
-        string[] files = Directory.GetFiles(resourcePath, "*.*", SearchOption.AllDirectories);
-        
-        foreach (string file in files)
-        {
-            try
-            {
-                string relativePath = file.Substring(resourcePath.Length + 1); // 获取相对路径
-                string targetPath = Path.Combine(vanillaPath, relativePath);
-                string targetDir = Path.GetDirectoryName(targetPath);
-
-                // 跳过manifest.json文件
-                if (Path.GetFileName(file).ToLower() == "manifest.json")
-                {
-                    Function.AddLog($"跳过manifest.json文件: {relativePath}");
-                    continue;
-                }
-
-                // 确保目标目录存在
-                if (!Directory.Exists(targetDir))
-                {
-                    Directory.CreateDirectory(targetDir);
-                }
-
-                // 检查是否为JSON文件
-                if (Path.GetExtension(file).ToLower() == ".json")
-                {
-                    MergeJsonFiles(file, targetPath, relativePath, resourceConfigDir, originalFilesDir, fileMappings);
-                }
-                // 检查是否为Lang文件
-                else if (Path.GetExtension(file).ToLower() == ".lang")
-                {
-                    MergeLangFiles(file, targetPath, relativePath, resourceConfigDir, originalFilesDir, fileMappings);
-                }
-                else
-                {
-                    // 对于非JSON文件，直接复制替换
-                    // 如果目标文件存在且映射中还没有记录，则备份原文件
-                    if (File.Exists(targetPath) && !fileMappings.ContainsKey(relativePath))
-                    {
-                        string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
-                        string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
-                        
-                        File.Copy(targetPath, backupPath, true);
-                        fileMappings[relativePath] = uniqueBackupName;
-                    }
-                    else if (!File.Exists(targetPath))
-                    {
-                        // 如果是新增文件，记录到AddFile列表
-                        addFiles.Add(relativePath);
-                    }
-                    File.Copy(file, targetPath, true);
-                    Function.AddLog($"已复制文件: {relativePath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Function.AddLog($"处理文件 {file} 时出错: {ex.Message}");
-            }
-        }
-    }
+    // private void ProcessResourceDirectory(string resourcePath, string vanillaPath, string resourceConfigDir,
+    //     string originalFilesDir, JObject fileMappings, JArray addFiles)
+    // {
+    //     string[] files = Directory.GetFiles(resourcePath, "*.*", SearchOption.AllDirectories);
+    //
+    //     foreach (string file in files)
+    //     {
+    //         try
+    //         {
+    //             string relativePath = file.Substring(resourcePath.Length + 1); // 获取相对路径
+    //             string targetPath = Path.Combine(vanillaPath, relativePath);
+    //             string targetDir = Path.GetDirectoryName(targetPath);
+    //
+    //             // 跳过manifest.json文件
+    //             if (Path.GetFileName(file).ToLower() == "manifest.json")
+    //             {
+    //                 Function.AddLog($"跳过manifest.json文件: {relativePath}");
+    //                 continue;
+    //             }
+    //
+    //             // 确保目标目录存在
+    //             if (!Directory.Exists(targetDir))
+    //             {
+    //                 Directory.CreateDirectory(targetDir);
+    //             }
+    //
+    //             // 检查是否为JSON文件
+    //             if (Path.GetExtension(file).ToLower() == ".json")
+    //             {
+    //                 MergeJsonFiles(file, targetPath, relativePath, resourceConfigDir, originalFilesDir, fileMappings);
+    //             }
+    //             // 检查是否为Lang文件
+    //             else if (Path.GetExtension(file).ToLower() == ".lang")
+    //             {
+    //                 MergeLangFiles(file, targetPath, relativePath, resourceConfigDir, originalFilesDir, fileMappings);
+    //             }
+    //             else
+    //             {
+    //                 // 对于非JSON文件，直接复制替换
+    //                 // 如果目标文件存在且映射中还没有记录，则备份原文件
+    //                 if (File.Exists(targetPath) && !fileMappings.ContainsKey(relativePath))
+    //                 {
+    //                     string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
+    //                     string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
+    //
+    //                     File.Copy(targetPath, backupPath, true);
+    //                     fileMappings[relativePath] = uniqueBackupName;
+    //                 }
+    //                 else if (!File.Exists(targetPath))
+    //                 {
+    //                     // 如果是新增文件，记录到AddFile列表
+    //                     addFiles.Add(relativePath);
+    //                 }
+    //
+    //                 File.Copy(file, targetPath, true);
+    //                 Function.AddLog($"已复制文件: {relativePath}");
+    //             }
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Function.AddLog($"处理文件 {file} 时出错: {ex.Message}");
+    //         }
+    //     }
+    // }
 
     /// <summary>
     /// 合并JSON文件
@@ -1034,10 +1125,19 @@ public partial class InstallBedrockResources : Page
     /// <param name="resourceConfigDir">资源配置目录</param>
     /// <param name="originalFilesDir">原始文件备份目录</param>
     /// <param name="fileMappings">文件映射关系</param>
-    private void MergeJsonFiles(string sourceFile, string targetFile, string relativePath, string resourceConfigDir, string originalFilesDir, JObject fileMappings)
+    private void MergeJsonFiles(string sourceFile, string targetFile, string relativePath, string resourceConfigDir,
+        string originalFilesDir, JObject fileMappings)
     {
         try
         {
+            if (relativePath.EndsWith("contents.json", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            // if (fileMappings.ContainsKey(relativePath))
+            // {
+            //     return;
+            // }
             // 读取源文件
             string sourceJsonText = File.ReadAllText(sourceFile);
             // 去除注释
@@ -1052,7 +1152,7 @@ public partial class InstallBedrockResources : Page
                 File.Copy(targetFile, backupPath, true);
                 fileMappings[relativePath] = uniqueBackupName;
             }
-            else if (!File.Exists(targetFile))
+            else if (!File.Exists(targetFile) && !fileMappings.ContainsKey(relativePath))
             {
                 // 如果是新增文件，记录到AddFile列表
                 fileMappings[relativePath] = ""; // 占位符，表示新增文件
@@ -1068,7 +1168,7 @@ public partial class InstallBedrockResources : Page
 
                 // 根据常量判断是否使用单层对比
                 bool useSingleLevelMerge = true; // 默认使用深度合并
-                
+
                 // 可以根据文件名或路径设置特定文件使用单层合并
                 // 例如：useSingleLevelMerge = relativePath.Contains("some_specific_file.json");
                 string[] specificFiles = new string[] { "_ui_defs.json", "_global_variables.json" };
@@ -1076,7 +1176,7 @@ public partial class InstallBedrockResources : Page
                 {
                     useSingleLevelMerge = false;
                 }
-                
+
                 if (useSingleLevelMerge)
                 {
                     // // 单层对比合并 - 只合并顶层属性
@@ -1108,15 +1208,16 @@ public partial class InstallBedrockResources : Page
                     //     }
                     // }
                 }
-                
+
 
                 // 写入合并后的结果，使用格式化输出
                 File.WriteAllText(targetFile, targetJson.ToString(Newtonsoft.Json.Formatting.Indented));
-                if (relativePath.EndsWith("contents.json"))
-                {
-                    File.Delete(targetFile);
-                    Function.AddLog($"已删除字典文件: {targetFile}");
-                }
+                // if (relativePath.EndsWith("contents.json"))
+                // {
+                //     File.Delete(targetFile);
+                //     Function.AddLog($"已删除字典文件: {targetFile}");
+                // }
+
                 Function.AddLog($"已合并JSON文件: {relativePath}" + (useSingleLevelMerge ? " (单层合并)" : " (深度合并)"));
             }
             else
@@ -1151,7 +1252,7 @@ public partial class InstallBedrockResources : Page
         bool escapeNext = false;
         bool inSingleLineComment = false;
         bool inMultiLineComment = false;
-        
+
         for (int i = 0; i < jsonText.Length; i++)
         {
             char c = jsonText[i];
@@ -1176,6 +1277,7 @@ public partial class InstallBedrockResources : Page
                 {
                     inString = false;
                 }
+
                 result.Append(c);
                 continue;
             }
@@ -1188,6 +1290,7 @@ public partial class InstallBedrockResources : Page
                     inMultiLineComment = false;
                     i++; // 跳过 '/'
                 }
+
                 continue;
             }
 
@@ -1199,6 +1302,7 @@ public partial class InstallBedrockResources : Page
                     inSingleLineComment = false;
                     result.Append(c);
                 }
+
                 continue;
             }
 
@@ -1241,7 +1345,8 @@ public partial class InstallBedrockResources : Page
     /// <param name="resourceConfigDir">资源配置目录</param>
     /// <param name="originalFilesDir">原始文件备份目录</param>
     /// <param name="fileMappings">文件映射关系</param>
-    private void MergeLangFiles(string sourceFile, string targetFile, string relativePath, string resourceConfigDir, string originalFilesDir, JObject fileMappings)
+    private void MergeLangFiles(string sourceFile, string targetFile, string relativePath, string resourceConfigDir,
+        string originalFilesDir, JObject fileMappings)
     {
         try
         {
@@ -1355,16 +1460,16 @@ public partial class InstallBedrockResources : Page
     private bool IsSpecialJsonFile(string relativePath)
     {
         string fileName = Path.GetFileName(relativePath).ToLower();
-        
+
         // 包含动画、行为、战利品表等文件通常需要特殊的合并处理
         string[] specialPatterns = { "animation", "behavior", "loot_table", "recipe", "trading" };
-        
+
         foreach (string pattern in specialPatterns)
         {
             if (fileName.Contains(pattern))
                 return true;
         }
-        
+
         return false;
     }
 
@@ -1382,7 +1487,7 @@ public partial class InstallBedrockResources : Page
             foreach (var property in sourceJson.Properties())
             {
                 string propertyName = property.Name;
-                
+
                 // 对于数组类型的属性，使用合并而非替换
                 if (property.Value.Type == JTokenType.Array)
                 {
@@ -1391,7 +1496,7 @@ public partial class InstallBedrockResources : Page
                         // 如果目标已存在该数组，合并两个数组
                         JArray targetArray = (JArray)targetJson[propertyName];
                         JArray sourceArray = (JArray)property.Value;
-                        
+
                         // 将源数组元素添加到目标数组
                         foreach (var item in sourceArray)
                         {
@@ -1462,7 +1567,8 @@ public partial class InstallBedrockResources : Page
                     return;
                 }
 
-                string vanillaResourcePath = Path.Combine(SettingsPage.pBedrockPath, SettingsPage.selectBedrockFolder, "data", "resource_packs", "vanilla_netease");
+                string vanillaResourcePath = Path.Combine(SettingsPage.pBedrockPath, SettingsPage.selectBedrockFolder,
+                    "data", "resource_packs", "vanilla_netease");
                 if (!Directory.Exists(vanillaResourcePath))
                 {
                     Function.AddLog("基岩版原版资源包目录不存在，请检查设置是否正确");
@@ -1477,34 +1583,25 @@ public partial class InstallBedrockResources : Page
                 string installedFlagPath = Path.Combine(vanillaResourcePath, "InstalledResources");
                 string resourceConfigPath = Path.Combine(vanillaResourcePath, "ResourceConfig");
                 bool needRestore = File.Exists(installedFlagPath) || Directory.Exists(resourceConfigPath);
-                
+
                 if (needRestore)
                 {
                     Function.AddLog("检测到已安装的资源包，正在执行还原操作...");
                     RestoreOriginalFiles(vanillaResourcePath, resourceConfigPath);
                     Function.AddLog("资源包还原完成");
-                    
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Function.ShowDialog("资源包还原完成", "提示");
-                    });
+
+                    Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog("资源包还原完成", "提示"); });
                 }
                 else
                 {
                     Function.AddLog("未检测到已安装的资源包，无需还原");
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Function.ShowDialog("未检测到已安装的资源包，无需还原", "提示");
-                    });
+                    Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog("未检测到已安装的资源包，无需还原", "提示"); });
                 }
             }
             catch (Exception ex)
             {
                 Function.AddLog($"还原过程中发生错误: {ex.Message}");
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    Function.ShowDialog($"还原过程中发生错误: {ex.Message}", "错误");
-                });
+                Application.Current.Dispatcher.Invoke(() => { Function.ShowDialog($"还原过程中发生错误: {ex.Message}", "错误"); });
             }
         });
     }

@@ -50,6 +50,7 @@ public partial class SettingsPage : Page
 
     public static string pBedrockPath = string.Empty;
     public static string selectBedrockFolder = string.Empty;
+    public static bool deleteDuplicate = false;
 
     #endregion
     
@@ -190,6 +191,8 @@ public partial class SettingsPage : Page
             GetMinecraftVersions(bedrockPath);
             ComboBoxSelectBedrockVersion.SelectedItem = currentConfig.selectedBedrockVersion;
             selectBedrockFolder = currentConfig.selectedBedrockVersion;
+            deleteDuplicate = currentConfig.deleteDuplicate;
+            CheckBoxDeleteDuplicate.IsChecked = currentConfig.deleteDuplicate;
         }
     }
 
@@ -271,13 +274,14 @@ public partial class SettingsPage : Page
         {
             Directory.CreateDirectory(ConfigFolder);
         }
-
+        deleteDuplicate = CheckBoxDeleteDuplicate.IsChecked ?? false;
         string selectVersion = ComboBoxSelectBedrockVersion.SelectedItem.ToString();
         File.WriteAllText(ConfigFolder + "\\settings.json", JsonConvert.SerializeObject(new JsonConfig()
         {
             bedrockPath = bedrockPath,
             selectedBedrockVersion = selectVersion,
-            channel = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>).Item1
+            channel = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>).Item1,
+            deleteDuplicate = deleteDuplicate
         }));
         GetMinecraftVersions(bedrockPath);
         selectBedrockFolder = selectVersion;

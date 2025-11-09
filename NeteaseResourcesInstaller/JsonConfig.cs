@@ -10,4 +10,6 @@ public class JsonConfig
     public string selectedBedrockVersion;
     [JsonProperty("Channel")]
     public string channel;
+    [JsonProperty("DeleteDuplicate")]
+    public bool deleteDuplicate;
 }

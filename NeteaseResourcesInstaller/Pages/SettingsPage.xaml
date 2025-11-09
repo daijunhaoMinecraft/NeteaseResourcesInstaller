@@ -46,6 +46,9 @@
                         </ui:SettingsCard>
                     </ui:SettingsExpander.Items>
                 </ui:SettingsExpander>
+                <ui:SettingsCard Header="删除网易原版重复的包" Description="防止如彩虹派这种大型UI材质包出现重复的项">
+                    <CheckBox x:Name="CheckBoxDeleteDuplicate" IsChecked="False"/>
+                </ui:SettingsCard>
                 <ui:SettingsCard Header="保存配置" Description="保存当前配置">
                     <Button Content="保存配置" Click="SaveConfig_Onclick"/>
                 </ui:SettingsCard>
