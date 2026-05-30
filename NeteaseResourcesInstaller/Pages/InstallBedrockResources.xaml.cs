@@ -1284,23 +1284,39 @@ public partial class InstallBedrockResources : Page
             // 读取源文件
             string sourceJsonText = File.ReadAllText(sourceFile);
             sourceJsonText = RemoveJsonComments(sourceJsonText);
-            JObject sourceJson = JObject.Parse(sourceJsonText);
+            JToken sourceToken = JToken.Parse(sourceJsonText);
 
             // 读取目标文件
             string targetJsonText = File.ReadAllText(targetFile);
             targetJsonText = RemoveJsonComments(targetJsonText);
-            JObject targetJson = JObject.Parse(targetJsonText);
+            JToken targetToken = JToken.Parse(targetJsonText);
 
-            // 深度合并 - 合并整个JSON结构
-            targetJson.Merge(sourceJson, new JsonMergeSettings
+            if (sourceToken is JArray sourceArr && targetToken is JArray targetArr)
             {
-                MergeArrayHandling = MergeArrayHandling.Concat,
-                MergeNullValueHandling = MergeNullValueHandling.Merge,
-                PropertyNameComparison = StringComparison.OrdinalIgnoreCase
-            });
-
-            // 写入合并后的结果
-            File.WriteAllText(targetFile, targetJson.ToString(Newtonsoft.Json.Formatting.Indented));
+                var existingSet = new HashSet<string>(targetArr.Select(t => t.ToString()));
+                foreach (var item in sourceArr)
+                {
+                    if (!existingSet.Contains(item.ToString()))
+                    {
+                        targetArr.Add(item);
+                    }
+                }
+                File.WriteAllText(targetFile, targetArr.ToString(Newtonsoft.Json.Formatting.Indented));
+            }
+            else if (sourceToken is JObject sourceJson && targetToken is JObject targetJson)
+            {
+                targetJson.Merge(sourceJson, new JsonMergeSettings
+                {
+                    MergeArrayHandling = MergeArrayHandling.Concat,
+                    MergeNullValueHandling = MergeNullValueHandling.Merge,
+                    PropertyNameComparison = StringComparison.OrdinalIgnoreCase
+                });
+                File.WriteAllText(targetFile, targetJson.ToString(Newtonsoft.Json.Formatting.Indented));
+            }
+            else
+            {
+                File.WriteAllText(targetFile, sourceToken.ToString(Newtonsoft.Json.Formatting.Indented));
+            }
         }
         catch (Exception ex)
         {
@@ -1409,7 +1425,7 @@ public partial class InstallBedrockResources : Page
                 }
 
                 // 检查是否为JSON文件
-                if (Path.GetExtension(file).ToLower() == ".json")
+                if (Path.GetExtension(file).ToLower() == ".json" || Path.GetExtension(file).ToLower() == ".material")
                 {
                     MergeJsonFiles(file, targetPath, relativePath, resourceConfigDir, originalFilesDir, fileMappings);
                 }
@@ -1568,9 +1584,8 @@ public partial class InstallBedrockResources : Page
             // }
             // 读取源文件
             string sourceJsonText = File.ReadAllText(sourceFile);
-            // 去除注释
             sourceJsonText = RemoveJsonComments(sourceJsonText);
-            JObject sourceJson = JObject.Parse(sourceJsonText);
+            JToken sourceToken = JToken.Parse(sourceJsonText);
 
             // 如果目标文件存在且还没有备份，则备份原文件
             if (File.Exists(targetFile) && !fileMappings.ContainsKey(relativePath))
@@ -1582,86 +1597,90 @@ public partial class InstallBedrockResources : Page
             }
             else if (!File.Exists(targetFile) && !fileMappings.ContainsKey(relativePath))
             {
-                // 如果是新增文件，记录到AddFile列表
-                fileMappings[relativePath] = ""; // 占位符，表示新增文件
+                fileMappings[relativePath] = "";
             }
 
             // 如果目标文件存在，则合并
             if (File.Exists(targetFile))
             {
                 string targetJsonText = File.ReadAllText(targetFile);
-                // 去除注释
                 targetJsonText = RemoveJsonComments(targetJsonText);
-                JObject targetJson = JObject.Parse(targetJsonText);
+                JToken targetToken = JToken.Parse(targetJsonText);
 
-                // 根据常量判断是否使用单层对比
-                bool useSingleLevelMerge = true; // 默认使用深度合并
-
-                // 可以根据文件名或路径设置特定文件使用单层合并
-                // 例如：useSingleLevelMerge = relativePath.Contains("some_specific_file.json");
-                string[] specificFiles = new string[] { "_ui_defs.json", "_global_variables.json" };
-                if (specificFiles.Any(f => relativePath.EndsWith(f)))
+                if (sourceToken is JArray sourceArr && targetToken is JArray targetArr)
                 {
-                    useSingleLevelMerge = false;
-                }
-
-                if (useSingleLevelMerge)
-                {
-                    // // 单层对比合并 - 只合并顶层属性
-                    foreach (var property in sourceJson.Properties())
+                    // 数组合并：将源数组中新元素追加到目标数组末尾（去重）
+                    var existingSet = new HashSet<string>(targetArr.Select(t => t.ToString()));
+                    foreach (var item in sourceArr)
                     {
-                        targetJson[property.Name] = property.Value.DeepClone();
+                        if (!existingSet.Contains(item.ToString()))
+                        {
+                            targetArr.Add(item);
+                        }
                     }
-                    //targetJson = sourceJson;
+                    File.WriteAllText(targetFile, targetArr.ToString(Newtonsoft.Json.Formatting.Indented));
+                }
+                else if (sourceToken is JObject sourceJson && targetToken is JObject targetJson)
+                {
+                    bool useSingleLevelMerge = true;
+
+                    string[] specificFiles = new string[] { "_ui_defs.json", "_global_variables.json" };
+                    if (specificFiles.Any(f => relativePath.EndsWith(f)))
+                    {
+                        useSingleLevelMerge = false;
+                    }
+
+                    if (useSingleLevelMerge)
+                    {
+                        foreach (var property in sourceJson.Properties())
+                        {
+                            targetJson[property.Name] = property.Value.DeepClone();
+                        }
+                    }
+                    else
+                    {
+                        targetJson.Merge(sourceJson, new JsonMergeSettings
+                        {
+                            MergeArrayHandling = MergeArrayHandling.Concat,
+                            MergeNullValueHandling = MergeNullValueHandling.Merge,
+                            PropertyNameComparison = StringComparison.OrdinalIgnoreCase
+                        });
+                    }
+
+                    File.WriteAllText(targetFile, targetJson.ToString(Newtonsoft.Json.Formatting.Indented));
                 }
                 else
                 {
-                    // 深度合并 - 合并整个JSON结构
-                    targetJson.Merge(sourceJson, new JsonMergeSettings
-                    {
-                        MergeArrayHandling = MergeArrayHandling.Concat,
-                        MergeNullValueHandling = MergeNullValueHandling.Merge,
-                        PropertyNameComparison = StringComparison.OrdinalIgnoreCase
-                    });
-                    // if (relativePath.EndsWith("_ui_defs.json") && targetJson["ui_defs"] != null)
-                    // {
-                    //     JArray uiDefs = (JArray)targetJson["ui_defs"];
-                    //     for (int i = uiDefs.Count - 1; i >= 0; i--)
-                    //     {
-                    //         string defsUI = uiDefs[i].ToString();
-                    //         if (defsUI.StartsWith("ui/netease/"))
-                    //         {
-                    //             uiDefs.RemoveAt(i);
-                    //         }
-                    //     }
-                    // }
+                    // 类型不匹配，直接覆盖
+                    File.WriteAllText(targetFile, sourceToken.ToString(Newtonsoft.Json.Formatting.Indented));
                 }
-
-
-                // 写入合并后的结果，使用格式化输出
-                File.WriteAllText(targetFile, targetJson.ToString(Newtonsoft.Json.Formatting.Indented));
-                // if (relativePath.EndsWith("contents.json"))
-                // {
-                //     File.Delete(targetFile);
-                //     Function.AddLog($"已删除字典文件: {targetFile}");
-                // }
-
-                Function.AddLog($"已合并JSON文件: {relativePath}" + (useSingleLevelMerge ? " (单层合并)" : " (深度合并)"));
             }
             else
             {
-                // 目标文件不存在，直接复制
-                File.WriteAllText(targetFile, sourceJson.ToString(Newtonsoft.Json.Formatting.Indented));
-                Function.AddLog($"已创建JSON文件: {relativePath}");
+                // 目标文件不存在，直接创建
+                File.WriteAllText(targetFile, sourceToken.ToString(Newtonsoft.Json.Formatting.Indented));
             }
         }
-        catch (JsonReaderException jsonEx)
-        {
-            Function.AddLog($"JSON格式错误 {relativePath}: {jsonEx.Message}");
-        }
+        // catch (JsonReaderException jsonEx)
+        // {
+        //     Function.AddLog($"JSON格式错误 {relativePath}: {jsonEx.Message}");
+        // }
         catch (Exception ex)
         {
             Function.AddLog($"合并JSON文件 {relativePath} 时出错: {ex.Message}");
+            // 对于非JSON/Lang文件，直接复制替换
+            // 如果目标文件存在且映射中还没有记录，则备份原文件
+            if (File.Exists(targetFile) && !fileMappings.ContainsKey(relativePath))
+            {
+                string uniqueBackupName = GetUniqueBackupFileName(relativePath, originalFilesDir);
+                string backupPath = Path.Combine(originalFilesDir, uniqueBackupName);
+
+                File.Copy(targetFile, backupPath, true);
+                fileMappings[relativePath] = uniqueBackupName;
+            }
+
+            File.Copy(sourceFile, targetFile, true);
+            //Function.AddLog($"已复制文件: {relativePath}");
         }
     }
 
