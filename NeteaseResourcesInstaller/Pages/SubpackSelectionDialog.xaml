@@ -1,0 +1,23 @@
+<ui:ContentDialog x:Class="NeteaseResourcesInstaller.Pages.SubpackSelectionDialog"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                  xmlns:ui="http://schemas.inkore.net/lib/ui/wpf/modern"
+                  mc:Ignorable="d"
+                  Title="选择子包"
+                  PrimaryButtonText="确认"
+                  CloseButtonText="取消"
+                  DefaultButton="Primary">
+    <StackPanel>
+        <TextBlock Text="检测到该资源包包含子包，请选择要安装的子包：" 
+                   TextWrapping="Wrap" 
+                   Margin="0,0,0,12"/>
+        <StackPanel x:Name="OptionsPanel">
+            <RadioButton x:Name="NoSubpacksOption" 
+                         Content="不使用子包" 
+                         IsChecked="True" 
+                         Margin="0,0,0,4"/>
+        </StackPanel>
+    </StackPanel>
+</ui:ContentDialog>
