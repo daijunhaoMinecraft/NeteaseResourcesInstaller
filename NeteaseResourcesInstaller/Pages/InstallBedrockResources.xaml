@@ -6,70 +6,95 @@
       xmlns:local="clr-namespace:NeteaseResourcesInstaller.Pages"
       xmlns:ui="http://schemas.inkore.net/lib/ui/wpf/modern"
       xmlns:ikw="http://schemas.inkore.net/lib/ui/wpf"
-      xmlns:models="using:NeteaseResourcesInstaller.Pages"
       mc:Ignorable="d" 
       d:DesignHeight="800"
       d:DesignWidth="1200"
       Title="基岩版资源包安装" >
-    <Grid>
-        <ScrollViewer  VerticalScrollBarVisibility="Auto">
-            <ikw:SimpleStackPanel Margin="55,20,20,0" Spacing="20">
-                <ui:InfoBar
-                            Title="注意" IsOpen="True" Severity="Warning"
-                            Message="使用此软件请先将基岩版客户端重置到原来的状态(未修改的状态,除软件标记完毕之外)并且vanilla_netease文件夹不能随意修改(包括但不限于修改/删除/替换文件等),否则可能会导致材质错误,需后果自负"> 
-                </ui:InfoBar>
-                <ikw:SimpleStackPanel x:Name="MainResourceControl" Spacing="10">
-                    <TextBlock Text="材质控制" FontSize="20" IsEnabled="False"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Row="0" Grid.Column="0" Content="导入MCPACK材质" Click="LoadNewResource_OnClick" Margin="0,0,10,0"/>
-                        <Button Grid.Row="0" Grid.Column="1" Content="删除材质" Click="DeleteResource_OnClick" Margin="0,0,10,0"/>
-                        <Button Grid.Row="0" Grid.Column="2" Content="材质优先级向上移动" Click="ResourceUp_OnClick" Margin="0,0,10,0"/>
-                        <Button Grid.Row="0" Grid.Column="3" Content="材质优先级向下移动" Click="ResourceDown_OnClick"></Button>
-                    </Grid>
-                    <Border Background="#fafafa"
-                            BorderBrush="#e0e0e0"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Padding="12">
-                        <ikw:SimpleStackPanel Spacing="10" Margin="0,10,0,0">
-                            <TextBlock Text="材质包列表" FontSize="20"/>
-                        
-                            <!-- 改为 ListView -->
-                            <ui:ListView x:Name="ResourcesList"
-                                         Grid.Row="1"
-                                         SelectionMode="Multiple"
-                                         Height="400"
-                                         SelectionChanged="ContentGridView_SelectionChanged">
-                                <ui:ListView.ItemTemplate>
-                                    <DataTemplate DataType="local:ResourceItem">
-                                        <StackPanel Orientation="Horizontal" Margin="10">
-                                            <Image Source="{Binding Thumbnail}" Width="128" Height="128" Stretch="UniformToFill" Margin="0,0,10,0"/>
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Title}" FontWeight="Bold" Margin="0,0,0,5"/>
-                                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" MaxWidth="300"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ui:ListView.ItemTemplate>
-                            </ui:ListView>
-                        </ikw:SimpleStackPanel>
-                    </Border>
-                </ikw:SimpleStackPanel>
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Button Content="安装材质" Click="InstallResource_Onclick"  Grid.Row="0" Grid.Column="0" Margin="0,0,10,0"/>
-                    <Button Content="还原材质" Click="RestoreResources_OnClick" Grid.Row="0" Grid.Column="1"/>
-                </Grid>
-            </ikw:SimpleStackPanel>
-            </ScrollViewer>
+    
+    <!-- 使用 Grid 替代 ScrollViewer，让 ListView 能够智能占满剩余空间 -->
+    <Grid Margin="55,20,20,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 警告信息 -->
+            <RowDefinition Height="Auto"/> <!-- 按钮控制栏 -->
+            <RowDefinition Height="*"/>    <!-- 列表区域 (自动拉伸占满) -->
+            <RowDefinition Height="Auto"/> <!-- 底部按钮 -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. 警告提示框 -->
+        <ui:InfoBar Grid.Row="0" Margin="0,0,0,20"
+                    Title="注意" IsOpen="True" Severity="Warning"
+                    Message="使用此软件请先将基岩版客户端重置到原来的状态(未修改的状态,除软件标记完毕之外)并且vanilla_netease文件夹不能随意修改(包括但不限于修改/删除/替换文件等),否则可能会导致材质错误,需后果自负"> 
+        </ui:InfoBar>
+
+        <!-- 2. 顶部控制栏 (导入/删除/上移/下移) -->
+        <ikw:SimpleStackPanel Grid.Row="1" Spacing="10" Margin="0,0,0,10">
+            <!-- 使用 Modern UI 提供的标准字体样式，而不是硬编码 FontSize -->
+            <TextBlock Text="材质控制" Style="{DynamicResource SubtitleTextBlockStyle}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="导入MCPACK材质" Click="LoadNewResource_OnClick" Margin="0,0,10,0"/>
+                <Button Grid.Column="1" Content="删除材质" Click="DeleteResource_OnClick" Margin="0,0,10,0"/>
+                <Button Grid.Column="2" Content="材质优先级向上移动" Click="ResourceUp_OnClick" Margin="0,0,10,0"/>
+                <Button Grid.Column="3" Content="材质优先级向下移动" Click="ResourceDown_OnClick"/>
+            </Grid>
+        </ikw:SimpleStackPanel>
+
+        <!-- 3. 材质列表区域 -->
+        <!-- 使用 DynamicResource 绑定系统颜色，完美兼容明暗主题切换 -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource LayerFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12"
+                Margin="0,0,0,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="材质包列表" Style="{DynamicResource SubtitleTextBlockStyle}" Margin="0,0,0,10"/>
+                
+                <!-- 移除了引发报错的 SelectionChanged -->
+                <!-- 移除了硬编码的 Height="400"，ListView 现在会自动铺满屏幕高度 -->
+                <ui:ListView x:Name="ResourcesList"
+                             Grid.Row="1"
+                             SelectionMode="Multiple">
+                    <ui:ListView.ItemTemplate>
+                        <DataTemplate DataType="local:ResourceItem">
+                            <StackPanel Orientation="Horizontal" Margin="10">
+                                <!-- 给图片加一个圆角裁剪，让 UI 看起来更现代 (类似 Win11) -->
+                                <Border Width="96" Height="96" CornerRadius="8" Margin="0,0,16,0" ClipToBounds="True">
+                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <!-- 文本同样适配 Modern UI 样式 -->
+                                    <TextBlock Text="{Binding Title}" Style="{DynamicResource BaseTextBlockStyle}" FontWeight="Bold" Margin="0,0,0,5"/>
+                                    <TextBlock Text="{Binding Description}" Style="{DynamicResource BodyTextBlockStyle}" 
+                                               TextWrapping="Wrap" MaxWidth="600" 
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ui:ListView.ItemTemplate>
+                </ui:ListView>
+            </Grid>
+        </Border>
+
+        <!-- 4. 底部安装/还原按钮 -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <!-- 给主要操作按钮添加了 Appearance="Primary"，让它拥有强调色 -->
+            <Button Content="安装材质" Click="InstallResource_Onclick" Grid.Column="0" Margin="0,0,10,0" ui:ControlHelper.CornerRadius="4" Style="{StaticResource AccentButtonStyle}"/>
+            <Button Content="还原材质" Click="RestoreResources_OnClick" Grid.Column="1" ui:ControlHelper.CornerRadius="4"/>
+        </Grid>
     </Grid>
 </ui:Page>

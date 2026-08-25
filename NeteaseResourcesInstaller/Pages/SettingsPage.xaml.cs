@@ -2,23 +2,24 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Security.AccessControl;
 using System.Windows;
 using System.Windows.Controls;
 using iNKORE.UI.WPF.Modern.Controls;
 using Microsoft.Win32;
 using Page = iNKORE.UI.WPF.Modern.Controls.Page;
-using System.Diagnostics;
 using Newtonsoft.Json;
+using System.Threading.Tasks; // 引入 Task
+using System.Linq;
+using System.Collections.Generic;
+using System;
 
 namespace NeteaseResourcesInstaller.Pages;
 
-public partial class SettingsPage : Page
+public partial class SettingsPage : Page, INotifyPropertyChanged
 {
     #region Var
     public static readonly string ConfigFolder = Path.Combine(Var.CurrentPath, "config");
-    private ObservableCollection<Tuple<string, string>> _canSelectBedrockVersion =
-        new ObservableCollection<Tuple<string, string>>();
+    private ObservableCollection<Tuple<string, string>> _canSelectBedrockVersion = new ObservableCollection<Tuple<string, string>>();
 
     public ObservableCollection<Tuple<string, string>> canSelectBedrockVersion
     {
@@ -26,7 +27,7 @@ public partial class SettingsPage : Page
         set
         {
             _canSelectBedrockVersion = value;
-            OnPropertyChanged(nameof(canSelectBedrockVersion));
+            OnPropertyChanged();
         }
     }
     public ObservableCollection<Tuple<string, string>> bedrockList = new ObservableCollection<Tuple<string, string>>()
@@ -45,6 +46,7 @@ public partial class SettingsPage : Page
             _bedrockPath = value;
             pBedrockPath = value;
             TextBoxSelectBedrockPath.Text = value;
+            OnPropertyChanged(); // 建议加上
         }
     }
 
@@ -56,9 +58,7 @@ public partial class SettingsPage : Page
     
     #region Application with xaml
     
-    // 实现 INotifyPropertyChanged
     public event PropertyChangedEventHandler PropertyChanged;
-
     protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -70,125 +70,124 @@ public partial class SettingsPage : Page
     
     public static bool VerifyMinecraftWindowsFolder(string folderPath)
     {
-        // Check
-        if (!Directory.Exists(folderPath))
-        {
-            //ShowDialog("文件夹不存在", "错误");
-            return false;
-        }
-        if (!File.Exists(Path.Combine(folderPath, "Minecraft.Windows.exe")))
-        {
-            //ShowDialog("未找到文件:Minecraft.Windows.exe", "错误");
-            return false;
-        }
-
-        if (!Directory.Exists(Path.Combine(folderPath, "data", "resource_packs", "vanilla_netease")))
-        {
-            //ShowDialog("无法定位到vanilla_netease文件夹", "错误");
-            return false;
-        }
+        if (!Directory.Exists(folderPath)) return false;
+        if (!File.Exists(Path.Combine(folderPath, "Minecraft.Windows.exe"))) return false;
+        if (!Directory.Exists(Path.Combine(folderPath, "data", "resource_packs", "vanilla_netease"))) return false;
         return true;
     }
 
-    public void GetMinecraftVersions(string folderPath)
+    // 【修改点1】将目录扫描改为异步方法，放入后台线程执行
+    public async Task GetMinecraftVersionsAsync(string folderPath)
     {
-        // 获取文件夹中的子目录文件夹
-        string[] subDirectories = Directory.GetDirectories(folderPath);
-        List<string> versions = new List<string>();
-        foreach (string subDirectory in subDirectories)
-        {
-            bool isValid = VerifyMinecraftWindowsFolder(subDirectory);
-            string version = Path.GetFileName(subDirectory);
-            if (isValid)
-            {
-                versions.Add(version);
-            }
-        }
-        ComboBoxSelectBedrockVersion.ItemsSource = versions;
-    }
-    
-    // 获取当前毫秒级时间戳
-    public static long GetCurrentTimestamp()
-    {
-        return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-    }
+        // 先在 UI 线程清空下拉框并禁用，防止用户在扫描时误操作
+        ComboBoxSelectBedrockVersion.ItemsSource = null;
+        ComboBoxSelectBedrockVersion.IsEnabled = false;
 
-    public JsonConfig ReadConfig()
-    {
-        string fileContent = File.ReadAllText(Path.Combine(ConfigFolder, "settings.json"));
         try
         {
-            // To Json Convert
+            // Task.Run 将耗时的磁盘扫描放到后台线程，不会卡死 UI
+            var versions = await Task.Run(() =>
+            {
+                List<string> validVersions = new List<string>();
+                if (!Directory.Exists(folderPath)) return validVersions;
+
+                // 可能会遇到权限异常，加上 try-catch
+                try
+                {
+                    string[] subDirectories = Directory.GetDirectories(folderPath);
+                    foreach (string subDirectory in subDirectories)
+                    {
+                        if (VerifyMinecraftWindowsFolder(subDirectory))
+                        {
+                            validVersions.Add(Path.GetFileName(subDirectory));
+                        }
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // 忽略没有权限访问的文件夹
+                }
+                return validVersions;
+            });
+
+            // 扫描完成后，自动回到 UI 线程更新控件
+            ComboBoxSelectBedrockVersion.ItemsSource = versions;
+        }
+        finally
+        {
+            ComboBoxSelectBedrockVersion.IsEnabled = true;
+        }
+    }
+    
+    public static long GetCurrentTimestamp() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    // 【修改点2】将配置读取也改为异步，防止文件读取卡顿
+    public async Task<JsonConfig> ReadConfigAsync()
+    {
+        string configPath = Path.Combine(ConfigFolder, "settings.json");
+        if (!File.Exists(configPath)) return null;
+
+        try
+        {
+            string fileContent = await Task.Run(() => File.ReadAllText(configPath));
             JsonConfig jJsonConfig = JsonConvert.DeserializeObject<JsonConfig>(fileContent);
-            // check
-            string bedrockPath = Path.Combine(jJsonConfig.bedrockPath, jJsonConfig.selectedBedrockVersion);
-            // Step 1: check folder and files
-            if (!VerifyMinecraftWindowsFolder(bedrockPath))
+            
+            // 下面的校验逻辑最好也放到后台执行，因为有 File/Directory 操作
+            return await Task.Run(() => 
             {
-                throw new Exception("目录校验失败");
-            }
-            // Step 2: Check Channel
-            bool isChannel = bedrockList.Any(x => x.Item1.Equals(jJsonConfig.channel));
-            if (!isChannel)
-            {
-                throw new Exception("渠道校验失败");
-            }
-            if (jJsonConfig.channel != "自定义路径")
-            {
-                string channelToFolderName = bedrockList.FirstOrDefault(x => x.Item1.Equals(jJsonConfig.channel)).Item2;
-                if (channelToFolderName == null)
+                string checkPath = Path.Combine(jJsonConfig.bedrockPath, jJsonConfig.selectedBedrockVersion ?? "");
+                if (!VerifyMinecraftWindowsFolder(checkPath)) throw new Exception("目录校验失败");
+
+                bool isChannel = bedrockList.Any(x => x.Item1.Equals(jJsonConfig.channel));
+                if (!isChannel) throw new Exception("渠道校验失败");
+
+                if (jJsonConfig.channel != "自定义路径")
                 {
-                    throw new Exception("渠道校验失败");
-                }
-                using (RegistryKey subKey = Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Netease\\{channelToFolderName}"))
-                {
-                    if (subKey != null)
+                    string channelToFolderName = bedrockList.FirstOrDefault(x => x.Item1.Equals(jJsonConfig.channel))?.Item2;
+                    if (channelToFolderName == null) throw new Exception("渠道校验失败");
+                    
+                    using (RegistryKey subKey = Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Netease\\{channelToFolderName}"))
                     {
-                        object value = subKey.GetValue("MinecraftBENeteasePath");
-                        if (value != null)
-                        {
-                            jJsonConfig.bedrockPath = value.ToString();
-                        }
-                        else
-                        {
-                            jJsonConfig.channel = "custom";
-                        }
-                    }
-                    else
-                    {
-                        jJsonConfig.channel = "custom";
+                        object value = subKey?.GetValue("MinecraftBENeteasePath");
+                        if (value != null) jJsonConfig.bedrockPath = value.ToString();
+                        else jJsonConfig.channel = "custom";
                     }
                 }
-            }
-            return JsonConvert.DeserializeObject<JsonConfig>(fileContent);
+                return jJsonConfig;
+            });
         }
         catch (Exception e)
         {
-            // Backup Old File
-            string BackupFileName = $"settings.json_{GetCurrentTimestamp().ToString()}.bak";
-            System.IO.File.Copy(Path.Combine(ConfigFolder, "settings.json"), System.IO.Path.Combine(ConfigFolder, $"settings.json_{GetCurrentTimestamp().ToString()}.bak"));
-            System.IO.File.Delete(Path.Combine(ConfigFolder, "settings.json"));
-            Function.ShowDialog($"我们在处理你的json文件时发生错误(我们已将原设置备份并且重新初始化了设置配置,文件名:{BackupFileName} in config folder):{e.Message}\n StackTrace: \n{e.StackTrace}", "错误");
+            string backupFileName = $"settings.json_{GetCurrentTimestamp()}.bak";
+            string backupPath = Path.Combine(ConfigFolder, backupFileName);
+            
+            await Task.Run(() => 
+            {
+                File.Copy(configPath, backupPath, true);
+                File.Delete(configPath);
+            });
+
+            // 回到 UI 线程再弹窗
+            Function.ShowDialog($"我们在处理你的json文件时发生错误(已备份为:{backupFileName}):\n{e.Message}", "错误");
             return null;
         }
     }
 
-    public void InitConfig()
+    public async Task InitConfigAsync()
     {
-        if (!File.Exists(Path.Combine(ConfigFolder, "settings.json")))
+        if (!Directory.Exists(ConfigFolder))
         {
-            if (!Directory.Exists(ConfigFolder))
-            {
-                Directory.CreateDirectory(ConfigFolder);
-            }
-            return;
+            Directory.CreateDirectory(ConfigFolder);
         }
-        JsonConfig currentConfig = ReadConfig();
+
+        JsonConfig currentConfig = await ReadConfigAsync();
         if (currentConfig != null)
         {
-            ComboBoxSelectBedrockPath.SelectedItem = currentConfig.channel;
+            ComboBoxSelectBedrockPath.SelectedItem = bedrockList.FirstOrDefault(x => x.Item1 == currentConfig.channel);
             bedrockPath = currentConfig.bedrockPath;
-            GetMinecraftVersions(bedrockPath);
+            
+            await GetMinecraftVersionsAsync(bedrockPath); // 异步获取版本
+            
             ComboBoxSelectBedrockVersion.SelectedItem = currentConfig.selectedBedrockVersion;
             selectBedrockFolder = currentConfig.selectedBedrockVersion;
             deleteDuplicate = currentConfig.deleteDuplicate;
@@ -202,6 +201,17 @@ public partial class SettingsPage : Page
     {
         InitializeComponent();
         DataContext = this;
+
+        // 【修改点3】不要在构造函数中执行耗时操作，改为在 Page_Loaded 事件中执行
+        this.Loaded += SettingsPage_Loaded;
+    }
+
+    private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        // 确保 Loaded 逻辑只执行一次
+        this.Loaded -= SettingsPage_Loaded;
+
+        // 注册表读取非常快，可以在此保留，但复杂 IO 需要等待
         foreach (Tuple<string, string> bedrockTest in bedrockList)
         {
             if (bedrockTest.Item2.Equals("Custom"))
@@ -211,40 +221,39 @@ public partial class SettingsPage : Page
             }
             using (RegistryKey subKey = Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Netease\\{bedrockTest.Item2}"))
             {
-                if (subKey != null)
+                object value = subKey?.GetValue("MinecraftBENeteasePath");
+                if (value != null)
                 {
-                    object value = subKey.GetValue("MinecraftBENeteasePath");
-                    if (value != null)
-                    {
-                        canSelectBedrockVersion.Add(new Tuple<string, string>(bedrockTest.Item1, value.ToString()));
-                    }
+                    canSelectBedrockVersion.Add(new Tuple<string, string>(bedrockTest.Item1, value.ToString()));
                 }
             }
+        }
+        if (ComboBoxSelectBedrockPath.Items.Count > 0)
             ComboBoxSelectBedrockPath.SelectedIndex = 0;
-        }
 
-        InitConfig();
+        await InitConfigAsync(); // 异步初始化配置
     }
 
-    private void SelectBedrockPath_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    // 【修改点4】事件处理器改为 async void
+    private async void SelectBedrockPath_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        string selectedBedrockPath = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>).Item2;
-        if (selectedBedrockPath.Equals("Custom"))
+        if (ComboBoxSelectBedrockPath.SelectedItem is Tuple<string, string> selected)
         {
-            // TextBoxSelectBedrockPath.IsReadOnly = false;
-            //bedrockPath = "";
-            SettingsCardCustomBedrockPath.IsEnabled = true;
-        }
-        else
-        {
-            //TextBoxSelectBedrockPath.IsReadOnly = true;
-            bedrockPath = selectedBedrockPath;
-            GetMinecraftVersions(selectedBedrockPath);
-            SettingsCardCustomBedrockPath.IsEnabled = false;
+            string selectedBedrockPath = selected.Item2;
+            if (selectedBedrockPath.Equals("Custom"))
+            {
+                SettingsCardCustomBedrockPath.IsEnabled = true;
+            }
+            else
+            {
+                bedrockPath = selectedBedrockPath;
+                SettingsCardCustomBedrockPath.IsEnabled = false;
+                await GetMinecraftVersionsAsync(selectedBedrockPath); // 异步调用
+            }
         }
     }
 
-    private void SelectFolder_OnClick(object sender, RoutedEventArgs e)
+    private async void SelectFolder_OnClick(object sender, RoutedEventArgs e)
     {
         OpenFolderDialog openFolderDialog = new OpenFolderDialog()
         {
@@ -254,36 +263,37 @@ public partial class SettingsPage : Page
         {
             string selectFolderName = openFolderDialog.FolderName;
             bedrockPath = selectFolderName;
-            GetMinecraftVersions(selectFolderName);
-            // 读取文件信息 Minecraft.Windows.exe
-            // FileVersionInfo fileVersionInfo = FileVersionInfo.GetVersionInfo(Path.Combine(selectFolderName, "Minecraft.Windows.exe"));
-            // string fileVersion = fileVersionInfo.FileVersion;
-            // bedrockPath = selectFolderName;
-            //ShowDialog($"成功选择到基岩版文件夹\n - 基岩版版本:{fileVersion}");
+            await GetMinecraftVersionsAsync(selectFolderName); // 异步调用
         }
     }
 
-    private void SaveConfig_Onclick(object sender, RoutedEventArgs e)
+    private async void SaveConfig_Onclick(object sender, RoutedEventArgs e)
     {
         if (ComboBoxSelectBedrockVersion.SelectedIndex == -1)
         {
             Function.ShowDialog("你尚未选择基岩版版本","错误");
             return;
         }
-        if (!Directory.Exists(ConfigFolder))
-        {
-            Directory.CreateDirectory(ConfigFolder);
-        }
+        
+        if (!Directory.Exists(ConfigFolder)) Directory.CreateDirectory(ConfigFolder);
+        
         deleteDuplicate = CheckBoxDeleteDuplicate.IsChecked ?? false;
         string selectVersion = ComboBoxSelectBedrockVersion.SelectedItem.ToString();
-        File.WriteAllText(ConfigFolder + "\\settings.json", JsonConvert.SerializeObject(new JsonConfig()
+        string channel = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>)?.Item1 ?? "自定义路径";
+
+        string json = JsonConvert.SerializeObject(new JsonConfig()
         {
             bedrockPath = bedrockPath,
             selectedBedrockVersion = selectVersion,
-            channel = (ComboBoxSelectBedrockPath.SelectedItem as Tuple<string, string>).Item1,
+            channel = channel,
             deleteDuplicate = deleteDuplicate
-        }));
-        GetMinecraftVersions(bedrockPath);
+        });
+
+        // 异步写入文件
+        await Task.Run(() => File.WriteAllText(Path.Combine(ConfigFolder, "settings.json"), json));
+        
+        await GetMinecraftVersionsAsync(bedrockPath); // 异步刷新列表
+        
         selectBedrockFolder = selectVersion;
         Function.ShowDialog($"保存设置成功!\n - 你选择的基岩版路径: {Path.Combine(bedrockPath, selectVersion)}");
     }
